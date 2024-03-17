@@ -1,0 +1,510 @@
+
+--Constants
+local MainFolder = script.Parent.Parent.Parent
+local SettingsF = MainFolder:WaitForChild("Settings")
+local BankingAPI = game.ServerScriptService:FindFirstChild("DRSBankingAPI")
+local Settings = require(SettingsF.MasterConfig)
+local Dialouge = Settings.Dialouge
+local Machine = script.Parent
+local Screen = Machine.Screen.Screen
+local MainGui = Screen:WaitForChild("ATMUIV2")
+local Sound = script.Parent.ReceiptPrinter.ReceiptPos:FindFirstChild('PrintSound') or Instance.new("Sound",script.Parent.ReceiptPrinter.ReceiptPos)
+Sound.Name = "PrintSound"
+Sound.SoundId = "rbxassetid://9114349040"
+
+local OutSound = script.Parent.CashOut.Union:FindFirstChild('OutSound') or Instance.new("Sound",script.Parent.CashOut.Union)
+OutSound.Name = "OutSound"
+OutSound.SoundId = "rbxassetid://9113880797"
+local TempData = {
+	InputtedPin = 0,
+	CardTool = nil
+}
+
+local CashSound = script.Parent.CashOut.Union:FindFirstChild('CashSound') or Instance.new("Sound",script.Parent.CashOut.Union)
+CashSound.Name = "CashSound"
+CashSound.SoundId = "rbxassetid://9067168007"
+CashSound.PlaybackSpeed = 0.3
+local TempData = {
+	InputtedPin = 0,
+	CardTool = nil
+}
+
+
+local MainData = {
+	Queue = {}
+}
+
+if SettingsF:FindFirstChild("ATMUIV2_Template") and SettingsF:FindFirstChild("ATMUIV2_Template"):FindFirstChild("ATMUIV2") then
+	local template = SettingsF:FindFirstChild("ATMUIV2_Template"):FindFirstChild("ATMUIV2")
+	for i,v in pairs(template.Application:GetChildren()) do
+		if MainGui.Application:FindFirstChild(v.Name) then
+			MainGui.Application:FindFirstChild(v.Name):Destroy()
+		end
+		v:Clone().Parent = MainGui.Application
+	end
+end
+
+local ButtonPages = {
+	General = {
+		[1] = "Cash",
+		[2] = "Cash & Receipt",
+		[4] = "Cancel",
+		[8] = "Balance Enquiry"
+	},
+	Cash = {
+		[1] = Settings.WithdrawlAmount[1],
+		[2] = Settings.WithdrawlAmount[2],
+		[3] = Settings.WithdrawlAmount[3],
+		[4] = Settings.WithdrawlAmount[4],
+		[5] = Settings.WithdrawlAmount[5],
+		[6] = Settings.WithdrawlAmount[6],
+		[7] = Settings.WithdrawlAmount[7],
+		[8] = "Cancel"
+	},
+}
+local storage = game.ServerStorage:FindFirstChild('ATM Temp Storage') or Instance.new("Folder",game.ServerStorage)
+storage.Name = "ATM Temp Storage"
+
+--Variables
+local CashV = false
+local PreviousMenu = nil
+MainGui.Boot.Visible = true
+MainGui.Application.Visible = false
+local Flash = false
+local SessionStorage = {
+	Active = false,
+	ActiveApplication = '',
+	ButtonPage = nil,
+	PrintReceipt = false,
+	CashAmount = nil,
+	Player = nil
+}
+
+function PlayBeep()
+	spawn(function()
+		Screen.Beep:Stop()
+		wait()
+		Screen.Beep:Play()
+		wait(0.13)
+		Screen.Beep:Stop()
+	end)
+end
+
+function ClearButtons()
+	for i,v in pairs(MainGui.Application.ButtonScreen.Buttons:GetChildren()) do
+		if v:IsA("TextLabel") then
+			v.Text = ""
+			v.Visible = false
+		end
+	end
+end
+
+function ChangeButtons(Page)
+	if ButtonPages[Page] then
+		ClearButtons()
+		SessionStorage.ButtonPage = Page
+		for i,v in pairs(ButtonPages[Page]) do
+			if MainGui.Application.ButtonScreen.Buttons:FindFirstChild("B"..tostring(i)) then
+				MainGui.Application.ButtonScreen.Buttons:FindFirstChild("B"..tostring(i)).Text = v
+				MainGui.Application.ButtonScreen.Buttons:FindFirstChild("B"..tostring(i)).Visible = true
+			end
+		end
+	end
+end
+
+function ChangeAppliation(Type,Arg1,Arg2)
+	if not MainGui.Application:FindFirstChild(Type) then return end
+	for i,v in pairs(MainGui.Application:GetChildren()) do
+		v.Visible = false
+	end
+	MainGui.Application:FindFirstChild(Type).Visible = true
+	SessionStorage.ActiveApplication = Type
+	if Type == "DisplayMessage" then
+		MainGui.Application.DisplayMessage.TopFrame.TextLabel.Text = Arg1
+		MainGui.Application.DisplayMessage.BottomFrame.TextLabel.Text = Arg2
+	elseif Type == "ButtonScreen" then
+		ChangeButtons(Arg1)
+		MainGui.Application.ButtonScreen.TopFrame.TextLabel.Text = Arg2
+	end
+end
+
+
+function RestartSession()
+	SessionStorage = {
+		Active = false,
+		ActiveApplication = '',
+		ActiveAccount = nil,
+		ButtonPage = nil,
+		PrintReceipt = false,
+		CashAmount = nil,
+		Player = nil
+	}
+	ClearButtons()
+	ChangeAppliation("StartScreen")
+	MainGui.Application.PinScreen.TopFrame.PinBox.Text = ""
+	TempData.InputtedPin = 0
+	FlashInput()
+
+end
+
+function OutputCard(f)
+	--FlashInput()
+
+	Machine.CardInput.Card.Transparency = 0
+	Machine.CardInput.Card.SurfaceGui.Enabled = true
+	Machine.CardInput.CardPos.PrismaticConstraint.TargetPosition = -0.8
+	wait(1.85)
+	Machine.CardInput.Card.Transparency = 1
+	pcall(function()
+		TempData.CardTool.Parent = SessionStorage.Player.Backpack
+	end)
+	--SessionStorage.Player = Player
+	TempData.CardTool = nil
+	repeat
+		wait()
+	until Machine.CardInput.Card.Transparency == 1
+	Machine.CardInput.Card.SurfaceGui.Enabled = false
+	Flash = false
+	if f then
+		RestartSession()
+	end
+end
+
+function Cancel()
+	ChangeAppliation("DisplayMessage",Dialouge.RemoveCard[1],Dialouge.RemoveCard[2])
+	OutputCard()
+	RestartSession()
+end
+
+function GetIntFromText(text)
+	local Length = string.len(Settings.Currency) + 1
+	return tonumber(string.sub(text,Length))
+end
+
+
+
+for i,v in pairs(Screen.Parent.Buttons:GetChildren()) do
+	if v:FindFirstChild("ClickDetector") then
+		v.ClickDetector.MouseClick:Connect(function(p)
+			local Buttons = MainGui.Application.ButtonScreen.Buttons
+			if Buttons:FindFirstChild(v.Name) and Buttons:FindFirstChild(v.Name).Visible == true then
+				if SessionStorage.ActiveApplication == 'BalanceScreen' then
+					SessionStorage.ActiveApplication = 'BalanceScreen2'
+					PlayBeep()
+					if v.Name == "B4" then
+						ChangeAppliation("ButtonScreen","General",Dialouge.ServiceSelection[1])
+					elseif v.Name == "B8" then
+						Cancel()
+					end
+				elseif SessionStorage.ActiveApplication == 'ButtonScreen' then
+					SessionStorage.ActiveApplication = 'ButtonScreen2'
+					PlayBeep()
+					local text = Buttons:FindFirstChild(v.Name).Text
+					if text == "Cancel" then
+						ChangeAppliation("DisplayMessage",Dialouge.RemoveCard[1],Dialouge.RemoveCard[2])
+						OutputCard(true)
+						--RestartSession() 
+					elseif text == "Balance Enquiry" then
+						
+						local Balance = BankingAPI:Invoke({
+							Type = "GetBalance",
+							Player = SessionStorage.Player
+						})
+						print(Balance)
+						if Balance == nil then
+							ChangeAppliation("DisplayMessage","There was an error communicating with the DRSBankingAPI","DRS Error")
+							wait(2.4)
+							Cancel()
+						else
+							MainGui.Application.BalanceScreen.NameT.Text = SessionStorage.Player.Name
+							MainGui.Application.BalanceScreen.Bal.Text = "Account Balance: "..Settings.Currency..string.format("%.2f", tostring(Balance))
+							ChangeAppliation("BalanceScreen")
+						end
+					elseif text == "Cash" then
+						SessionStorage.PrintReceipt = false
+						ChangeAppliation("ButtonScreen","Cash",Dialouge.WithdrawlSelection[1])
+					elseif text == "Cash & Receipt" then
+						SessionStorage.PrintReceipt = true
+						ChangeAppliation("ButtonScreen","Cash",Dialouge.WithdrawlSelection[1])
+					elseif GetIntFromText(text) ~= nil and GetIntFromText(text) ~= 0 and SessionStorage.ButtonPage == "Cash" and SessionStorage.ActiveApplication == "ButtonScreen2" then
+						if Machine.ReceiptPrinter:FindFirstChild("ReceiptGrab") then
+							Machine.ReceiptPrinter:FindFirstChild("ReceiptGrab"):Destroy()
+						end
+						wait(0.1)
+						SessionStorage.CashAmount = GetIntFromText(text)
+						ChangeAppliation("DisplayMessage",Dialouge.Auth1[1],Dialouge.Auth1[2])
+						wait(3)
+						ChangeAppliation("DisplayMessage",Dialouge.Auth2[1],Dialouge.Auth2[2])
+						wait(2.4)
+						if SessionStorage.Player == nil then
+							return
+						end
+						local Check = BankingAPI:Invoke({
+							Type = "WithdrawRequest",
+							Player = SessionStorage.Player,
+							WithdrawAmount = SessionStorage.CashAmount	
+						})
+						if Check == false then
+							ChangeAppliation("DisplayMessage",Dialouge.InsufficientBalance[1],Dialouge.InsufficientBalance[2])
+							wait(3)
+							ChangeAppliation("ButtonScreen","General",Dialouge.ServiceSelection[1])
+						elseif Check == nil then
+							ChangeAppliation("DisplayMessage","There was an error communicating with the DRSBankingAPI","DRS Error")
+							wait(2.4)
+							Cancel()
+						elseif Check == true then
+							ChangeAppliation("DisplayMessage",Dialouge.RemoveCard[1],Dialouge.RemoveCard[2])
+							wait(0.4)
+							OutputCard()
+							wait(1)
+							ChangeAppliation("DisplayMessage",Dialouge.DispenseCash[1],Dialouge.DispenseCash[2])
+							wait(0.5)
+							CashSound:Play()
+							wait(2)
+							CashSound:Stop()
+							CashSound.TimePosition = 0
+							wait(0.3)
+							Machine.CashOut.DoorPos.PrismaticConstraint.TargetPosition = -0.15
+							wait(3)
+							local Cash = SessionStorage.CashAmount
+							repeat
+								local Output = 0
+								if Cash > 50 then
+									Output = 50
+								elseif Cash > 20 then
+									Output = 20
+								elseif Cash >= 10 then
+									Output = 10
+								elseif Cash >= 5 then
+									Output = 5
+								end
+								Cash = Cash - Output
+								table.insert(MainData.Queue,{Output})
+								if Output == 0 then
+									break
+								end
+							until Cash == 0
+							wait(0.1)
+							CashF()
+							wait(0.8)
+							ChangeAppliation("DisplayMessage",Dialouge.TakeCash[1],Dialouge.TakeCash[2])
+							wait(2)
+							repeat
+								wait()
+							until #MainData.Queue == 0 and not Machine.CashOut:FindFirstChild("CashGrab")
+							wait(1)
+							Machine.CashOut.DoorPos.PrismaticConstraint.TargetPosition = 0
+
+							if SessionStorage.PrintReceipt == true then
+								wait(2)
+								ChangeAppliation("DisplayMessage",Dialouge.PrintingReceipt[1],Dialouge.PrintingReceipt[2])
+								wait(3)
+								ChangeAppliation("DisplayMessage",Dialouge.TakeReceipt[1],Dialouge.TakeReceipt[2])
+								if Machine.ReceiptPrinter:FindFirstChild("ReceiptGrab") then
+									Machine.ReceiptPrinter:FindFirstChild("ReceiptGrab"):Destroy()
+								end
+								wait(0.2)
+								local clone = Machine.ReceiptPrinter.Receipt:Clone()
+								clone.Name = "ReceiptGrab"
+								clone.Parent = Machine.ReceiptPrinter
+								clone.SurfaceGui.Amount.Text = string.format("%.2f", tostring(SessionStorage.CashAmount))
+								clone.SurfaceGui.Type.Text = "WITHDRAWL"
+								clone.SurfaceGui.Player.Text = SessionStorage.Player.Name
+								Sound:Play()
+								clone.Player.Value = SessionStorage.Player
+								spawn(function()
+									wait(1.55)
+									clone.Script.Disabled = false
+								end)
+								clone.Anchored = false
+								clone.PrismaticConstraint.TargetPosition = -0.7
+							end
+							wait(1)
+							ChangeAppliation("DisplayMessage",Dialouge.Finish[1],Dialouge.Finish[2])
+							wait(2)
+							RestartSession()
+						end
+					end
+				end
+			end
+		end)
+	end
+end
+
+
+
+Machine.CardInput.Hitbox.Touched:Connect(function(obj)
+	if obj.Name == "Handle" and obj.Parent.Name == "Debit Card" and SessionStorage.Active == false then
+		SessionStorage.Active = true
+		local Player = game.Players:GetPlayerFromCharacter(obj.Parent.Parent)
+		if Player.Backpack:FindFirstChild("Debit Card") then
+			TempData.CardTool = Player.Backpack:FindFirstChild("Debit Card")
+			TempData.CardTool.Parent = storage
+		elseif Player.Character:FindFirstChild("Debit Card") then
+			TempData.CardTool = Player.Character:FindFirstChild("Debit Card")
+			TempData.CardTool.Parent = storage
+		end
+		SessionStorage.Player = Player
+
+		Flash = false
+		--wait(0.2)
+		Machine.CardInput.Card.Transparency = 0
+		Machine.CardInput.Card.SurfaceGui.Enabled = true
+		wait(0.7)
+		Machine.CardInput.CardPos.PrismaticConstraint.TargetPosition = 0
+		wait(1.7)
+		ChangeAppliation("DisplayMessage",Dialouge.CheckingCard[1],Dialouge.CheckingCard[2])
+		wait(3)
+		ChangeAppliation("PinScreen")
+	end
+end)
+
+Machine.Pinpad.Keypad.ClickDetector.MouseClick:Connect(function(Player)
+	if SessionStorage.ActiveApplication == "PinScreen" and TempData.InputtedPin < 4 then
+		PlayBeep()
+		--Machine.Pinpad.Keypad.ButtonPress:Play()
+		MainGui.Application.PinScreen.TopFrame.PinBox.Text = MainGui.Application.PinScreen.TopFrame.PinBox.Text.."*"
+		TempData.InputtedPin = TempData.InputtedPin + 1
+		--[[if TempData.InputtedPin == 4 then
+			wait(1)
+			ChangeAppliation("DisplayMessage","Processing pin","Please wait")
+			wait(3)
+			ChangeAppliation("ButtonScreen","General","Please select service")
+		end--]]
+	end
+end)
+
+Machine.Pinpad.Cancel.ClickDetector.MouseClick:Connect(function(Player)
+	if SessionStorage.ActiveApplication == "PinScreen" then
+		PlayBeep()
+		Cancel()
+	end
+end)
+
+Machine.Pinpad.Clear.ClickDetector.MouseClick:Connect(function(Player)
+	if SessionStorage.ActiveApplication == "PinScreen" then
+		--Machine.Pinpad.Keypad.ButtonPress:Play()
+		PlayBeep()
+		MainGui.Application.PinScreen.TopFrame.PinBox.Text = ""
+		TempData.InputtedPin = 0
+		--[[if TempData.InputtedPin == 4 then
+			wait(1)
+			ChangeAppliation("DisplayMessage","Processing pin","Please wait")
+			wait(3)
+			ChangeAppliation("ButtonScreen","General","Please select service")
+		end--]]
+	end
+end)
+
+Machine.Pinpad.Enter.ClickDetector.MouseClick:Connect(function(Player)
+	if SessionStorage.ActiveApplication == "PinScreen" and TempData.InputtedPin == 4 then
+		--Machine.Pinpad.Enter.ButtonPress:Play()
+		PlayBeep()
+
+		ChangeAppliation("DisplayMessage",Dialouge.ProcesingPin[1],Dialouge.ProcesingPin[2])
+		MainGui.Application.PinScreen.TopFrame.PinBox.Text = ""
+		TempData.InputtedPin = 0
+		wait(3)
+		ChangeAppliation("ButtonScreen","General",Dialouge.ServiceSelection[1])
+	end
+end)
+
+--[[Machine.CardInput.Card.ClickDetector.MouseClick:Connect(function(Player)
+	if Machine.CardInput.Card.Transparency == 0 then
+		Machine.CardInput.Card.Transparency = 1
+		pcall(function()
+			TempData.CardTool.Parent = Player.Backpack
+		end)
+		SessionStorage.Player = Player
+		TempData.CardTool = nil
+	end
+end)--]]
+
+function FlashInput()
+	Flash = true
+	spawn(function()
+		repeat
+			wait(0.65)
+			Machine.CardInput.Flash.Color = Color3.fromRGB(46, 184, 41)
+			Machine.CardInput.Flash.Material = Enum.Material.Neon
+			wait(0.65)
+			Machine.CardInput.Flash.Color = Color3.fromRGB(23, 94, 21)
+			Machine.CardInput.Flash.Material = Enum.Material.SmoothPlastic
+		until Flash == false
+	end)
+end
+
+function CashF()
+	spawn(function()
+		CashV = true
+		repeat
+			wait()
+			if not Machine.CashOut:FindFirstChild("CashGrab") and #MainData.Queue > 0 then
+				local data = MainData.Queue[1][1]
+				if data <= 0 then
+					table.remove(MainData.Queue,1)
+				else
+					local clone = Machine.CashOut.Cash:Clone()
+					clone.Name = "CashGrab"
+					clone.Parent = Machine.CashOut
+					clone.Amount.Value = data
+					if Settings.NoteDecals[data] then
+						clone.Top.Texture = Settings.NoteDecals[data][1]
+						clone.Bottom.Texture = Settings.NoteDecals[data][2]
+					end
+					clone.Player.Value = SessionStorage.Player
+					spawn(function()
+						wait(1.55)
+						clone.Script.Disabled = false
+					end)
+					table.remove(MainData.Queue,1)
+					clone.Anchored = false
+					clone.Top.Transparency = 0
+					clone.Bottom.Transparency = 0
+					clone.Transparency = 0
+					OutSound:Play()
+
+					clone.PrismaticConstraint.TargetPosition = 0
+				end
+				if #MainData.Queue == 0 then
+					CashV = false
+				end
+				if SessionStorage.Player == nil then
+					CashV = false
+				end
+			end
+		until CashV == false
+	end)
+end
+
+function LoopAdverts()
+	spawn(function()
+		while wait() do
+			for i,v in pairs(MainGui.Application.StartScreen.Advertisements:GetChildren()) do
+				for i,z in pairs(MainGui.Application.StartScreen.Advertisements:GetChildren()) do
+					z.Visible = false
+				end
+				v.Visible = true
+				wait(Settings.AdvertLoopTime)
+			end
+		end
+	end)
+end
+
+game.Players.PlayerRemoving:Connect(function(Player)
+	if SessionStorage.Player == Player then
+		OutputCard(true)
+	end
+end)
+
+MainGui:WaitForChild('AnimationHandler').Done.Event:Connect(function(e)
+	LoopAdverts()
+	MainGui.Boot.Visible = false
+	MainGui.Application.Visible = true
+	if BankingAPI == nil then
+		ChangeAppliation("DisplayMessage","DRSBankingAPI Was not found inside of ServerScriptService, DRSBankingAPI is required for this ATM to function.","DRS API ERROR")
+		return
+	end
+	RestartSession()
+end)
+

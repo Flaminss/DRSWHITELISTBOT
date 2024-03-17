@@ -1,0 +1,10 @@
+{
+    "token": "YOURTOKEN",
+    "clientID": "1008073807837270036",
+    "status": {
+        "type": "Playing",
+        "text": "Running discord.js v14",
+        "online": "dnd"
+    },
+    "APIKey": "28B54YG92-0485-470F-AB4D-C543FGFS3E2-AF9C5351-9SS7-499B0-A7E2-545GWEFA6"
+}

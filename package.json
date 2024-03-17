@@ -1,0 +1,41 @@
+{
+  "name": "saberbot",
+  "version": "1.0.0",
+  "description": "A discord bot that communicates with the ScoreSaber and BeatSaver API",
+  "main": "index.js",
+  "scripts": {
+    "main": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rangeclone/SaberBot.git"
+  },
+  "engines": {
+    "node": "14.x"
+  },
+  "author": "Modder0Source",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Rangeclone/SaberBot/issues"
+  },
+  "homepage": "https://github.com/Rangeclone/SaberBot#readme",
+  "dependencies": {
+    "@discordjs/builders": "^0.6.0",
+    "@discordjs/rest": "^0.1.0-canary.0",
+    "bloxlink-api": "^1.0.3",
+    "common-tags": "^1.8.2",
+    "discord-api-types": "^0.23.1",
+    "discord.js": "^14.9.0",
+    "express": "^4.18.1",
+    "express-session": "^1.17.3",
+    "fs": "^0.0.1-security",
+    "noblox.js": "^4.13.1",
+    "request": "^2.88.2",
+    "request-promise": "^4.2.6",
+    "request-promise-any": "^1.0.9",
+    "util": "^0.12.4"
+  },
+  "devDependencies": {
+    "eslint": "^7.32.0"
+  }
+}

@@ -1,0 +1,62 @@
+{
+    "10235782066": {
+        "Name": "Starter Bundle",
+        "Price": 800,
+        "Whitelist": "starter",
+        "Role": "Starter Files",
+        "Channel": "997591731002421379",
+        "GBP": 5.00,
+        "Guild": "856122881086849049",
+        "Invite": "https://discord.gg/EKzepDYvfB",
+        "JSON": "./whitelists/Starter.json",
+        "ChoiceName": "DRS-Starter"
+    },
+    "10431117155": {
+        "Name": "Upgrade Bundle",
+        "Price": 450,
+        "Whitelist": "upgrade",
+        "Role": "Upgrade Files",
+        "Channel": "1003354594266591262",
+        "GBP": 4.00,
+        "Guild": "856122881086849049",
+        "Invite": "https://discord.gg/EKzepDYvfB",
+        "JSON": "./whitelists/Upgrade.json",
+        "ChoiceName": "DRS-Upgrade"
+    },
+    "10637876659": {
+        "Name": "Vocovo",
+        "Price": 500,
+        "Whitelist": "vocovo",
+        "Role": "Vocovo Files",
+        "Channel": "1009796675986018424",
+        "GBP": 3.00,
+        "Guild": "856122881086849049",
+        "Invite": "https://discord.gg/EKzepDYvfB",
+        "JSON": "./whitelists/Vocovo.json",
+        "ChoiceName": "DRS-Vocovo"
+    },
+    "13243007190": {
+        "Name": "Hotel POS",
+        "Price": 500,
+        "Whitelist": "hotel",
+        "Role": "Hotel Files",
+        "Channel": "1100132475910504579",
+        "GBP": 3.00,
+        "Guild": "856122881086849049",
+        "Invite": "https://discord.gg/EKzepDYvfB",
+        "JSON": "./whitelists/Hotel.json",
+        "ChoiceName": "DRS-Hotel"
+    },
+    "13243009458": {
+        "Name": "Restaurant POS",
+        "Price": 500,
+        "Whitelist": "restaurant",
+        "Role": "Restaurant Files",
+        "Channel": "1100132153771176087",
+        "GBP": 3.00,
+        "Guild": "856122881086849049",
+        "Invite": "https://discord.gg/EKzepDYvfB",
+        "JSON": "./whitelists/Restaurant.json",
+        "ChoiceName": "DRS-Restaurant"
+    }
+}
